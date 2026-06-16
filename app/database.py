@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 DATABASE_URL = ""
 
 # 2. Создание асинхронного движка
-# echo=True будет логгировать в консоль все sql запросу, которые мы будем делать
+# echo=True будет логгировать в консоль все sql запросы, которые мы будем делать
 engine = create_async_engine(DATABASE_URL, echo=True)
 # expire_on_commit=False will prevent attributes from being expired
 # after commit.
