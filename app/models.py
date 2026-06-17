@@ -9,9 +9,9 @@ class User(Base):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, index=True)
-    surname = Column(String, index=True)
-    age = Column(Integer, index=True)
+    name = Column(String)
+    followers = Column(Integer, ForeignKey('followers.id'))
+    following = Column(Integer, ForeignKey('following.id'))
     api_key = Column(String, default=0)
 
     twits = relationship('Twits', cascade='all, delete-orphan')
@@ -54,3 +54,18 @@ class Likes(Base):
     # ID твита, на который поставили лайк
     belongs_to = Column(Integer, ForeignKey('twits.id'))
 
+
+class Followers(Base):
+    '''Модель подписчиков'''
+    __tablename__ = 'followers'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String)
+
+
+class Following(Base):
+    '''Модель подписок'''
+    __tablename__ = 'following'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String)

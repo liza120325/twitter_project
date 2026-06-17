@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # 1. Строка подключения
-DATABASE_URL = ""
+DATABASE_URL = "postgresql+asyncpg://admin:secretpassword@db:5432/fastapi_db"
 
 # 2. Создание асинхронного движка
 # echo=True будет логгировать в консоль все sql запросы, которые мы будем делать
