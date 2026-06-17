@@ -14,9 +14,12 @@ app = FastAPI()
 
 # 2. Создаем маршрут для GET-запроса на главную страницу
 @app.get("/check")
-def read_root():
+def check():
     return {"message": "Привет, это простой API на FastAPI!"}
 
+@app.get("/api")
+def get_my_api():
+    return {"message": "Привет!"}
 
 
 
