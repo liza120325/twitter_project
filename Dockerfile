@@ -8,6 +8,7 @@ RUN python -m pip install -r /app/requirements.txt
 
 COPY ./app/database.py /app/
 COPY ./app/models.py /app/
+COPY ./app/schemas.py /app/
 COPY ./static /app/
 COPY ./app/app.py /app/
 

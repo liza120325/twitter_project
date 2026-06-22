@@ -1,7 +1,7 @@
 services:
 
-  api:
-    container_name: api
+  fastapi:
+    container_name: fastapi
     build: .
     ports:
       - "8000:8000"
@@ -46,7 +46,7 @@ services:
       - "8080:80"
     depends_on:
       - db
-      - api
+      - fastapi
     networks:
       - app-network
     volumes:

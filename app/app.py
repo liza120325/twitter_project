@@ -1,47 +1,99 @@
-import os
-from fastapi import FastAPI, Request
-from contextlib import asynccontextmanager
-from models import User, Likes, Twits, Followers, Following
-from database import engine, async_session, Base
+from typing import Annotated, Dict, List, Optional
 
-STATIC_FOLDER_ABSOLUTE = os.path.abspath(os.path.join("..", "static"))
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from array import array
+from schemas import UserOut, TweetOut, TweetIn, MediaOut
+from fastapi import FastAPI, Request, Header, Depends
+from contextlib import asynccontextmanager
+from database import engine, async_session, session, Base, User, Likes, Twits
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Application is starting up...")
-    # Initialize databases, load ML models, or open network connections here
-
     async with engine.begin() as conn:
         # здесь передаем синхронную функцию - create_all, которую нужно дождаться
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-    async with async_session() as session:
-        async with session.begin():
-            follower_1 = Followers(name="Вася")
-            following_1 = Following(name="Света")
-            session.add(follower_1)
-            session.add(following_1)
+    async with async_session() as start_session:
+        async with start_session.begin():
+            user_1 = User(name="Коля", api_key="test")
+            user_2 = User(name="Лев", api_key="tolstoy")
+            user_3 = User(name="Александр", api_key="pushkin")
+            user_4 = User(name="Михаил", api_key="lermontov")
 
-            user_1 = User(name="Коля", api_key="123456", followers=1, following=1)
-            session.add(user_1)
+            start_session.add(user_1)
+            start_session.add(user_2)
+            start_session.add(user_3)
+            start_session.add(user_4)
+
+            user_4.followers = [user_1]
+            user_4.following = [user_1]
+            user_1.following = [user_4]
+            user_1.followers = [user_4]
 
 
     yield
 
-    print("Application is shutting down...")
 
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/check")
-def check():
-    return {"message": "Привет, это простой API на FastAPI!"}
+@app.get("/api/users/me", response_model=UserOut)
+async def get_users_me(api_key: Annotated[str, Header()]):
+    async with async_session() as session:
+
+        user = await session.execute(
+            select(User).where(User.api_key == api_key).options(
+                selectinload(User.following), selectinload(User.followers)
+            )
+        )
+        result = user.scalars().first()
+
+        data = {
+            "result": "true",
+            "user": {
+                "id": result.id,
+                "name": result.name,
+                "followers": [{"id": x.id, "name": x.name} for x in result.followers],
+                "following": [{"id": x.id, "name": x.name} for x in result.following],
+            }
+        }
+    return data
 
 
-@app.get("/api/users/me")
-def get_my_api():
-    return {"message": "Привет!"}
+@app.get("/api/users/{user_id}", response_model=UserOut)
+async def get_users_me(user_id: int):
+    async with async_session() as session:
+
+        user = await session.execute(
+            select(User).where(User.id == user_id).options(
+                selectinload(User.following), selectinload(User.followers)
+            )
+        )
+        result = user.scalars().first()
+
+        data = {
+            "result": "true",
+            "user": {
+                "id": result.id,
+                "name": result.name,
+                "followers": [{"id": x.id, "name": x.name} for x in result.followers],
+                "following": [{"id": x.id, "name": x.name} for x in result.following],
+            }
+        }
+    return data
+
+
+@app.post("/api/tweets", response_model=TweetOut)
+async def post_new_tweet(api_key: Annotated[str, Header()], tweet_data: TweetIn):
+    pass
+
+
+@app.post("/api/medias", response_model=MediaOut)
+async def post_new_media(api_key: Annotated[str, Header()], ):
+    pass
 
 
 
