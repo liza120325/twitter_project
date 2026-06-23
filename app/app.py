@@ -1,10 +1,12 @@
 from typing import Annotated, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update, insert
 from sqlalchemy.orm import selectinload
 from array import array
-from schemas import UserOut, TweetOut, TweetIn, MediaOut
-from fastapi import FastAPI, Request, Header, Depends
+
+from app.database import user_following
+from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow
+from fastapi import FastAPI, Request, Header, Depends, UploadFile
 from contextlib import asynccontextmanager
 from database import engine, async_session, session, Base, User, Likes, Twits
 
@@ -19,19 +21,27 @@ async def lifespan(app: FastAPI):
     async with async_session() as start_session:
         async with start_session.begin():
             user_1 = User(name="Коля", api_key="test")
-            user_2 = User(name="Лев", api_key="tolstoy")
+            user_2 = User(name="Марина", api_key="tsvetaeva")
             user_3 = User(name="Александр", api_key="pushkin")
             user_4 = User(name="Михаил", api_key="lermontov")
 
-            start_session.add(user_1)
-            start_session.add(user_2)
-            start_session.add(user_3)
-            start_session.add(user_4)
+            start_session.add_all([user_1, user_2, user_3, user_4])
 
             user_4.followers = [user_1]
-            user_4.following = [user_1]
-            user_1.following = [user_4]
             user_1.followers = [user_4]
+
+            tweet_1 = Twits(context='Я помню чудное мгновенье', author=3)
+            tweet_2 = Twits(context='Выхожу один я на дорогу', author=4)
+            tweet_3 = Twits(context='Мне Нравится, что вы больны не мной', author=2)
+            tweet_4 = Twits(context='Сегодня чудесный день!', author=1)
+
+            start_session.add_all([tweet_1, tweet_2, tweet_3, tweet_4])
+
+            like_1 = Likes(user_id=1, tweet_id=1)
+            like_2 = Likes(user_id=2, tweet_id=1)
+            like_3 = Likes(user_id=4, tweet_id=1)
+
+            start_session.add_all([like_1, like_2, like_3])
 
 
     yield
@@ -86,14 +96,56 @@ async def get_users_me(user_id: int):
     return data
 
 
-@app.post("/api/tweets", response_model=TweetOut)
-async def post_new_tweet(api_key: Annotated[str, Header()], tweet_data: TweetIn):
+@app.get("/api/tweets", response_model=TweetOut)
+async def get_user_tweets(api_key: Annotated[str, Header()]):
     pass
+#     '''Пользователь может получить ленту с твитами'''
+#
+#     async with async_session() as session:
+#         # Получаем ID тех, на кого подписан пользователь
+#         all_users = await session.execute(
+#             select(User.following).where(User.api_key == api_key)
+#         )
+#         result = all_users.scalars().all()
+#
+#         # По полученным ID выше собираем все твиты
+#         for id in result:
+#             all_tweets = await session.execute(
+#                 select(Twits).where(Twits.user_id == id)
+#             )
+#
+#         total_tweets =
 
 
-@app.post("/api/medias", response_model=MediaOut)
-async def post_new_media(api_key: Annotated[str, Header()], ):
-    pass
+
+
+
+
+
+# @app.post("/api/medias/{media_id}", response_model=MediaOut)
+# async def post_new_media(api_key: Annotated[str, Header()], file: UploadFile):
+#     async with async_session() as session:
+#         pass
+
+
+@app.post("/api/users/{id}/follow", response_model=Follow)
+async def follow_user(api_key: Annotated[str, Header()], id: int):
+    async with async_session() as session:
+
+        # Проверяем подписан ли пользователь
+
+
+
+        to_follow = await session.execute(
+            insert(user_following).where(User.api_key == api_key).values(i_follow=id, i_am_followed=id)
+        )
+
+        data = {"result": "true"}
+
+    return data
+
+
+
 
 
 

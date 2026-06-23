@@ -39,10 +39,23 @@ class TweetIn(BaseModel):
     attachments: list[int] | None
 
 
+class MediaIn(BaseModel):
+
+    tweet_id: int
+
+
 class MediaOut(BaseModel):
 
     result: bool
     media_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class Follow(BaseModel):
+
+    result: bool
 
     class Config:
         orm_mode = True

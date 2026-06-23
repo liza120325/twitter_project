@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from typing import Dict, Any
-from sqlalchemy import Column, String, Integer, ForeignKey, Table
-from sqlalchemy.orm import relationship
+from typing import Dict, Any, List
+from sqlalchemy import Column, String, Integer, ForeignKey, Table, UniqueConstraint
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 # 1. Строка подключения
 DATABASE_URL = "postgresql+asyncpg://admin:secretpassword@db:5432/fastapi_db"
@@ -24,7 +24,7 @@ class User(Base):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)
+    name = Column(String, nullable=False)
     api_key = Column(String, default=0)
 
     # На кого ПОДПИСАН этот пользователь (тех, кого он читает)
@@ -43,7 +43,13 @@ class User(Base):
         back_populates='following'
     )
 
-    twits = relationship('Twits', cascade='all, delete-orphan')
+    twits = relationship('Twits', back_populates='user_id', cascade='all, delete-orphan')
+
+    like_from_user_id = relationship('Likes',
+                                     back_populates='user_id_relationship',
+                                     cascade='all, delete-orphan')
+
+
 
 user_following = Table(
     'user_following', Base.metadata,
@@ -58,15 +64,15 @@ class Twits(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     context = Column(String, nullable=False)
-    attachments = Column(Integer, default=False)
     author = Column(Integer, ForeignKey('user.id'))
+
+    # Связь с таблицей лайков
     likes = relationship('Likes', cascade='all, delete-orphan')
+    # Связь с таблицей изображений
+    attachments = relationship('Images', cascade='all, delete-orphan')
 
-    def __repr__(self):
-        return f"Твит {self.twit_text}"
+    user_id = relationship('User', back_populates='twits')
 
-    def to_json(self) -> Dict[str, Any]:
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 class Likes(Base):
@@ -76,12 +82,22 @@ class Likes(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # ID пользователя, поставившего лайк
-    user_id = Column(Integer, nullable=False)
-    name = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'))
+
+    # Связь с таблицей Пользователь
+    user_id_relationship = relationship('User',
+                                        back_populates='like_from_user_id')
 
     # ID твита, на который поставили лайк
-    like_belongs_to = Column(Integer, ForeignKey('twits.id'))
+    tweet_id = Column(Integer, ForeignKey('twits.id'))
+
 
 
 class Images(Base):
-    pass
+    __tablename__ = 'images'
+
+    media_id = Column(Integer, primary_key=True, autoincrement=True)
+    tweet_id = Column(Integer, ForeignKey('twits.id'))
+    path = Column(String)
+
+
