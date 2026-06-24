@@ -1,15 +1,18 @@
 from typing import Annotated, Dict, List, Optional
 
-from sqlalchemy import select, update, insert
+import uvicorn
+from sqlalchemy import select, update, insert, exists
 from sqlalchemy.orm import selectinload
 from array import array
-
-from app.database import user_following
 from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow
 from fastapi import FastAPI, Request, Header, Depends, UploadFile
 from contextlib import asynccontextmanager
-from database import engine, async_session, session, Base, User, Likes, Twits
+from database import engine, async_session, session, Base, User, Likes, Twits, user_following
+import logging
 
+logger = logging.getLogger('logger_for_app')
+logging.basicConfig(level=logging.DEBUG, filename='fastapi.log')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +31,6 @@ async def lifespan(app: FastAPI):
             start_session.add_all([user_1, user_2, user_3, user_4])
 
             user_4.followers = [user_1]
-            user_1.followers = [user_4]
 
             tweet_1 = Twits(context='Я помню чудное мгновенье', author=3)
             tweet_2 = Twits(context='Выхожу один я на дорогу', author=4)
@@ -99,27 +101,6 @@ async def get_users_me(user_id: int):
 @app.get("/api/tweets", response_model=TweetOut)
 async def get_user_tweets(api_key: Annotated[str, Header()]):
     pass
-#     '''Пользователь может получить ленту с твитами'''
-#
-#     async with async_session() as session:
-#         # Получаем ID тех, на кого подписан пользователь
-#         all_users = await session.execute(
-#             select(User.following).where(User.api_key == api_key)
-#         )
-#         result = all_users.scalars().all()
-#
-#         # По полученным ID выше собираем все твиты
-#         for id in result:
-#             all_tweets = await session.execute(
-#                 select(Twits).where(Twits.user_id == id)
-#             )
-#
-#         total_tweets =
-
-
-
-
-
 
 
 # @app.post("/api/medias/{media_id}", response_model=MediaOut)
@@ -130,18 +111,39 @@ async def get_user_tweets(api_key: Annotated[str, Header()]):
 
 @app.post("/api/users/{id}/follow", response_model=Follow)
 async def follow_user(api_key: Annotated[str, Header()], id: int):
-    async with async_session() as session:
+    async with (async_session() as session):
 
-        # Проверяем подписан ли пользователь
-
-
-
-        to_follow = await session.execute(
-            insert(user_following).where(User.api_key == api_key).values(i_follow=id, i_am_followed=id)
+        # Получаем текущего пользователя
+        get_user = await session.execute(select(User).where(User.api_key == api_key).options(
+            selectinload(User.following), selectinload(User.followers)
+            )
         )
+        user_me = get_user.scalars().first()
+        logger.info("Получен текущий пользователь")
 
-        data = {"result": "true"}
+        # Получаем пользователя, на которого подписываемся
+        get_following = await session.execute(select(User).where(User.id == id).options(
+            selectinload(User.following), selectinload(User.followers))
+        )
+        user_following = get_following.scalars().first()
+        logger.info("Получен пользователь, на которого подписываемся")
 
+        # Проверяем, подписан ли текущий пользователь на выбранного
+        logger.info("Пороверяем подписку")
+        check = user_following in user_me.following
+
+        if not check:
+            logger.info("Пользователь не подписан")
+            try:
+                # Оформляем подписку
+                user_me.following.append(user_following)
+                logger.info("Подписка оформлена")
+
+            except Exception as ex:
+                return f"'result': 'false', 'error_type': {type(ex).__name__}, 'error_message': {str(ex)}"
+
+        await session.commit()
+    data = {"result": "true"}
     return data
 
 
