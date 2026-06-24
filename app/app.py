@@ -7,12 +7,22 @@ from array import array
 from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow
 from fastapi import FastAPI, Request, Header, Depends, UploadFile
 from contextlib import asynccontextmanager
-from database import engine, async_session, session, Base, User, Likes, Twits, user_following
+from database import (
+    engine,
+    async_session,
+    session,
+    Base,
+    User,
+    Likes,
+    Twits,
+    user_following,
+)
 import logging
 
-logger = logging.getLogger('logger_for_app')
-logging.basicConfig(level=logging.DEBUG, filename='fastapi.log')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("logger_for_app")
+logging.basicConfig(level=logging.DEBUG, filename="fastapi.log")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,7 +33,7 @@ async def lifespan(app: FastAPI):
 
     async with async_session() as start_session:
         async with start_session.begin():
-            user_1 = User(name="Коля", api_key="test")
+            user_1 = User(name="Harry Potter", api_key="test")
             user_2 = User(name="Марина", api_key="tsvetaeva")
             user_3 = User(name="Александр", api_key="pushkin")
             user_4 = User(name="Михаил", api_key="lermontov")
@@ -32,10 +42,10 @@ async def lifespan(app: FastAPI):
 
             user_4.followers = [user_1]
 
-            tweet_1 = Twits(context='Я помню чудное мгновенье', author=3)
-            tweet_2 = Twits(context='Выхожу один я на дорогу', author=4)
-            tweet_3 = Twits(context='Мне Нравится, что вы больны не мной', author=2)
-            tweet_4 = Twits(context='Сегодня чудесный день!', author=1)
+            tweet_1 = Twits(context="Я помню чудное мгновенье", author=3)
+            tweet_2 = Twits(context="Выхожу один я на дорогу", author=4)
+            tweet_3 = Twits(context="Мне Нравится, что вы больны не мной", author=2)
+            tweet_4 = Twits(context="Сегодня чудесный день!", author=1)
 
             start_session.add_all([tweet_1, tweet_2, tweet_3, tweet_4])
 
@@ -44,7 +54,6 @@ async def lifespan(app: FastAPI):
             like_3 = Likes(user_id=4, tweet_id=1)
 
             start_session.add_all([like_1, like_2, like_3])
-
 
     yield
 
@@ -57,9 +66,9 @@ async def get_users_me(api_key: Annotated[str, Header()]):
     async with async_session() as session:
 
         user = await session.execute(
-            select(User).where(User.api_key == api_key).options(
-                selectinload(User.following), selectinload(User.followers)
-            )
+            select(User)
+            .where(User.api_key == api_key)
+            .options(selectinload(User.following), selectinload(User.followers))
         )
         result = user.scalars().first()
 
@@ -70,7 +79,7 @@ async def get_users_me(api_key: Annotated[str, Header()]):
                 "name": result.name,
                 "followers": [{"id": x.id, "name": x.name} for x in result.followers],
                 "following": [{"id": x.id, "name": x.name} for x in result.following],
-            }
+            },
         }
     return data
 
@@ -80,9 +89,9 @@ async def get_users_me(user_id: int):
     async with async_session() as session:
 
         user = await session.execute(
-            select(User).where(User.id == user_id).options(
-                selectinload(User.following), selectinload(User.followers)
-            )
+            select(User)
+            .where(User.id == user_id)
+            .options(selectinload(User.following), selectinload(User.followers))
         )
         result = user.scalars().first()
 
@@ -93,7 +102,7 @@ async def get_users_me(user_id: int):
                 "name": result.name,
                 "followers": [{"id": x.id, "name": x.name} for x in result.followers],
                 "following": [{"id": x.id, "name": x.name} for x in result.following],
-            }
+            },
         }
     return data
 
@@ -111,19 +120,22 @@ async def get_user_tweets(api_key: Annotated[str, Header()]):
 
 @app.post("/api/users/{id}/follow", response_model=Follow)
 async def follow_user(api_key: Annotated[str, Header()], id: int):
-    async with (async_session() as session):
+    async with async_session() as session:
 
         # Получаем текущего пользователя
-        get_user = await session.execute(select(User).where(User.api_key == api_key).options(
-            selectinload(User.following), selectinload(User.followers)
-            )
+        get_user = await session.execute(
+            select(User)
+            .where(User.api_key == api_key)
+            .options(selectinload(User.following), selectinload(User.followers))
         )
         user_me = get_user.scalars().first()
         logger.info("Получен текущий пользователь")
 
         # Получаем пользователя, на которого подписываемся
-        get_following = await session.execute(select(User).where(User.id == id).options(
-            selectinload(User.following), selectinload(User.followers))
+        get_following = await session.execute(
+            select(User)
+            .where(User.id == id)
+            .options(selectinload(User.following), selectinload(User.followers))
         )
         user_following = get_following.scalars().first()
         logger.info("Получен пользователь, на которого подписываемся")
@@ -140,15 +152,51 @@ async def follow_user(api_key: Annotated[str, Header()], id: int):
                 logger.info("Подписка оформлена")
 
             except Exception as ex:
-                return f"'result': 'false', 'error_type': {type(ex).__name__}, 'error_message': {str(ex)}"
+                return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
+                        f"'error_message': {str(ex)}")
 
         await session.commit()
     data = {"result": "true"}
     return data
 
 
+@app.delete("/api/users/{id}/follow", response_model=Follow)
+async def unfollow_user(api_key: Annotated[str, Header()], id: int):
+    async with async_session() as session:
 
+        # Получаем текущего пользователя
+        get_user = await session.execute(
+            select(User)
+            .where(User.api_key == api_key)
+            .options(selectinload(User.following), selectinload(User.followers))
+        )
+        user_me = get_user.scalars().first()
+        logger.info("Получен текущий пользователь")
 
+        # Получаем пользователя, от которого отписываемся
+        get_following = await session.execute(
+            select(User)
+            .where(User.id == id)
+            .options(selectinload(User.following), selectinload(User.followers))
+        )
+        user_following = get_following.scalars().first()
+        logger.info("Получен пользователь, от которого отписываемся")
 
+        # Проверяем, подписан ли текущий пользователь на того, от кого он хочет отписаться
+        logger.info("Проверяем, подписан ли текущий пользователь на того, от кого он хочет отписаться")
+        check = user_following in user_me.following
 
+        if check:
+            logger.info("Отписываемся")
+            try:
+                # Отписываемся
+                user_me.following.remove(user_following)
+                logger.info("Вы успешно отписались")
 
+            except Exception as ex:
+                return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
+                        f"'error_message': {str(ex)}")
+
+        await session.commit()
+    data = {"result": "true"}
+    return data
