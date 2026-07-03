@@ -3,6 +3,7 @@ from typing import Annotated, Dict, List, Optional
 from pathlib import Path
 import uvicorn
 import aiofiles
+from array import array
 import asyncio
 from sqlalchemy import select, update, insert, exists, delete, and_
 from sqlalchemy.orm import selectinload
@@ -204,12 +205,12 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
             select(User.id, User.name)
             .where(User.api_key == api_key)
         )
-        user_me = get_user.scalars().first()
+        user_me = get_user.all()
         logger.info(f"Получен текущий пользователь {user_me}")
 
         # Добавляем ID и Имя пользователя, ID твита в таблицу лайков
-        add_like = await session.execute(insert(Likes).values(user_id=user_me[0],
-                                                              user_name=user_me[1],
+        add_like = await session.execute(insert(Likes).values(user_id=user_me[0][0],
+                                                              user_name=user_me[0][1],
                                                               tweet_id=id))
         logger.info("Лайк поставлен")
         await session.commit()
@@ -226,13 +227,13 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
         get_user = await session.execute(
             select(User.id).where(User.api_key == api_key)
         )
-        user_me = get_user.scalars().first()
+        user_me = get_user.all()
         logger.info(f"Получен текущий пользователь {user_me}")
 
 
         # Удалеяем ID твита из таблицы лайков
         delete_like = await session.execute(delete(Likes).where(and_(Likes.tweet_id == id,
-                                                                     Likes.user_id == user_me[0])))
+                                                                     Likes.user_id == user_me[0][0])))
         logger.info("Лайк удален")
         await session.commit()
 
@@ -240,21 +241,64 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
     return data
 
 
-@app.get("/api/tweets", response_model=TweetOut)
-async def get_user_tweets(api_key: Annotated[str, Header()]):
-    pass
 
 
 @app.post("/api/medias", response_model=MediaOut)
-async def post_new_media(api_key: Annotated[str, Header()], insert_file: UploadFile = File(...)):
+async def post_new_media(api_key: Annotated[str, Header()], insert_file: UploadFile):
     # Сохранить файл
-    directory = Path("media_storage")
+    directory = Path("media")
     directory.mkdir(parents=True, exist_ok=True)
     contents = insert_file.file.read()
-    file_path = directory / insert_file.filename
+    file_path = directory / f'{insert_file.filename}'
+    logger.info(f"Путь для сохранения файла {file_path}")
 
-    async with aiofiles.async_open(file_path, mode="wb") as f:
+    async with aiofiles.open(str(file_path), mode="wb") as f:
         await f.write(contents)
+        logger.info("Файл сохранен")
 
-    # Внести в базу данных путь к папке с изображением
-    insert_data = await session.execute(insert(Images).values(path=file_path))
+    async with async_session() as session:
+        # Внести в базу данных путь к папке с изображением
+        new_file = Images(path=str(file_path))
+        logger.info("Файл добавлен в БД")
+        session.add(new_file)
+        await session.commit()
+
+        return {"result": "true", "media_id": new_file.media_id}
+
+
+@app.post("/api/tweets", response_model=TweetOut)
+async def post_new_tweet(api_key: Annotated[str, Header()],
+                          tweet: TweetIn):
+    tweet_context = tweet.tweet_data
+    tweet_images = tweet.tweet_media_ids
+
+    async with async_session() as session:
+
+        # Получаем автора твита
+        get_user = await session.execute(
+            select(User.id).where(User.api_key == api_key)
+        )
+        user_me = get_user.scalars().first()
+        logger.info(f"Получен текущий пользователь {user_me}")
+
+        # Добавляем новый твит
+        new_tweet = Twits(context=tweet_context, author=user_me)
+        session.add(new_tweet)
+        logger.info(f"Твит добавлен в БД")
+
+        # Добавляем изображение к новому твиту
+        if tweet_images:
+            logger.info(f"Твит содержит картинку")
+            new_tweet.attachments.append(tweet_images)
+            logger.info(f"К твиту добавлена картинка")
+            # ОБновляем в таблице изображений ID твита
+            get_image_tweet_id = await session.execute(
+            update(Images).where(Images.media_id == tweet_images).values(tweet_id=new_tweet.id))
+            await session.commit()
+            logger.info(f"Обновлена инфо в БД в таблице Изображений, присвоен ID твита")
+            return {"result": "true", "tweet_id": new_tweet.id}
+
+        else:
+            return {"result": "true", "tweet_id": new_tweet.id}
+
+

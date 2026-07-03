@@ -11,7 +11,7 @@ COPY ./app/models.py /app/
 COPY ./app/schemas.py /app/
 COPY ./static /app/
 COPY ./app/app.py /app/
-COPY ./media_storage /app/
+COPY ./media /app/
 
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

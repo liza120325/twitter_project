@@ -35,8 +35,8 @@ class TweetOut(BaseModel):
 
 class TweetIn(BaseModel):
 
-    context: str
-    attachments: list[int] | None
+    tweet_data: str
+    tweet_media_ids: list[int] | None
 
 
 class MediaIn(BaseModel):
