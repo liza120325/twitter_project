@@ -69,7 +69,7 @@ class Twits(Base):
     # Связь с таблицей лайков
     likes = relationship('Likes', cascade='all, delete-orphan')
     # Связь с таблицей изображений
-    attachments = relationship('Images', cascade='all, delete-orphan')
+    attachments = relationship('Images', back_populates='tweet', cascade='all, delete-orphan')
 
     user_id = relationship('User', back_populates='twits')
 
@@ -83,6 +83,7 @@ class Likes(Base):
 
     # ID пользователя, поставившего лайк
     user_id = Column(Integer, ForeignKey('user.id'))
+    user_name = Column(String)
 
     # Связь с таблицей Пользователь
     user_id_relationship = relationship('User',
@@ -99,5 +100,8 @@ class Images(Base):
     media_id = Column(Integer, primary_key=True, autoincrement=True)
     tweet_id = Column(Integer, ForeignKey('twits.id'))
     path = Column(String)
+
+    # Связь с таблицей твитов
+    tweet = relationship('Twits', back_populates='attachments')
 
 
