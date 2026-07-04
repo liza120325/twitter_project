@@ -244,7 +244,7 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
 
 
 @app.post("/api/medias", response_model=MediaOut)
-async def post_new_media(api_key: Annotated[str, Header()], insert_file: UploadFile):
+async def post_new_media(insert_file: UploadFile):
     # Сохранить файл
     directory = Path("media")
     directory.mkdir(parents=True, exist_ok=True)
@@ -282,23 +282,28 @@ async def post_new_tweet(api_key: Annotated[str, Header()],
         logger.info(f"Получен текущий пользователь {user_me}")
 
         # Добавляем новый твит
-        new_tweet = Twits(context=tweet_context, author=user_me)
-        session.add(new_tweet)
+        stmt = (insert(Twits).values(context=tweet_context, author=user_me).returning(Twits.id))
+        result = await session.execute(stmt)
+
+        new_tweet_id = result.scalar()
         logger.info(f"Твит добавлен в БД")
 
         # Добавляем изображение к новому твиту
         if tweet_images:
             logger.info(f"Твит содержит картинку")
-            new_tweet.attachments.append(tweet_images)
-            logger.info(f"К твиту добавлена картинка")
+
             # ОБновляем в таблице изображений ID твита
-            get_image_tweet_id = await session.execute(
-            update(Images).where(Images.media_id == tweet_images).values(tweet_id=new_tweet.id))
+            update_tweet_id = await session.execute(update(Images).where(
+                Images.media_id == tweet_images[0]).values(tweet_id=new_tweet_id))
+            logger.info(f"в таблице изображений ID твита обновлен")
+
             await session.commit()
             logger.info(f"Обновлена инфо в БД в таблице Изображений, присвоен ID твита")
-            return {"result": "true", "tweet_id": new_tweet.id}
+
+            return {"result": "true", "tweet_id": new_tweet_id}
 
         else:
-            return {"result": "true", "tweet_id": new_tweet.id}
+            await session.commit()
+            return {"result": "true", "tweet_id": new_tweet_id}
 
 

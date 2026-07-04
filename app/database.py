@@ -65,6 +65,7 @@ class Twits(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     context = Column(String, nullable=False)
     author = Column(Integer, ForeignKey('user.id'))
+    # attachment_ids = Column(Integer, ForeignKey('images.media_id'), nullable=True)
 
     # Связь с таблицей лайков
     likes = relationship('Likes', cascade='all, delete-orphan')
