@@ -3,7 +3,7 @@ from pathlib import Path
 import aiofiles
 from sqlalchemy import select, update, insert, delete, and_
 from sqlalchemy.orm import selectinload
-from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow
+from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow, TweetDelete
 from fastapi import FastAPI, Header, UploadFile
 from contextlib import asynccontextmanager
 from database import (
@@ -257,8 +257,6 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
     return data
 
 
-
-
 @app.post("/api/medias", response_model=MediaOut)
 async def post_new_media(api_key: Annotated[str, Header()], file: UploadFile):
     # Сохранить файл
@@ -326,3 +324,28 @@ async def post_new_tweet(api_key: Annotated[str, Header()],
             return {"result": "true", "tweet_id": new_tweet_id}
 
 
+@app.delete("/api/tweets/{id}", response_model=TweetDelete)
+async def delete_tweet(api_key: Annotated[str, Header()], id: int):
+
+    async with async_session() as session:
+        # Получаем текущего пользователя
+        get_user = await session.execute(
+            select(User.id).where(User.api_key == api_key)
+        )
+        user_me = get_user.scalars().first()
+        logger.info(f"Получен текущий пользователь {user_me}")
+
+        # Удаляем твит
+        try:
+            tweet_delete = await session.execute(delete(Twits).where(and_(Twits.author == user_me,
+                                                                          Twits.id == id)))
+            await session.commit()
+            logger.info('Твит удален')
+
+        except Exception as ex:
+            logger.info('Нельзя удалить чужой твит')
+            return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
+                    f"'error_message': {str(ex)}")
+
+    data = {"result": "true"}
+    return data

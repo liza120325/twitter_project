@@ -99,7 +99,7 @@ class Images(Base):
     __tablename__ = 'images'
 
     media_id = Column(Integer, primary_key=True, autoincrement=True)
-    tweet_id = Column(Integer, ForeignKey('twits.id'), default=None)
+    tweet_id = Column(Integer, ForeignKey('twits.id', ondelete='CASCADE'), default=None)
     path = Column(String)
 
     # Связь с таблицей твитов

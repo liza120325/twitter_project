@@ -59,3 +59,11 @@ class Follow(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class TweetDelete(BaseModel):
+
+    result: bool
+
+    class Config:
+        orm_mode = True
