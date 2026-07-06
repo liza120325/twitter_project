@@ -12,10 +12,13 @@ services:
       always
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:secretpassword@db:5432/fastapi_db
+      STATIC_DIR: /static/media
     networks:
       - app-network
     volumes:
       - ./app:/app
+      - ./static/media:/static/media
+
 
   db:
     container_name: db
@@ -51,10 +54,13 @@ services:
       - app-network
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/usr/share/nginx/html/static:ro
+      - ./static:/usr/share/nginx/html/static
+      - ./static/media:/usr/share/nginx/html/static/media
 
 
 networks:
   app-network:
     driver: bridge
 
+volumes:
+  static_volume:
