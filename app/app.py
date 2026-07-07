@@ -393,7 +393,6 @@ async def get_tweets(api_key: Annotated[str, Header()]):
             logger.info(f"Собраны данные в словарь {collect_data}")
         logger.info(f"Собраны данные {tweets_list}")
 
-Fh
         data = {
             "result": "true",
             "tweets": tweets_list
