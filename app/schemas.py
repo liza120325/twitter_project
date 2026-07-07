@@ -1,12 +1,8 @@
 from pydantic import BaseModel, Field
 
-# данные классы используются для валидации и сериализации данных
-
-# избегаем дублирования кода и выносим все общие детали в отдельный класс
 class Follow(BaseModel):
     id: int
     name: str
-
 
 class User(BaseModel):
     id: int
@@ -53,7 +49,7 @@ class MediaOut(BaseModel):
         orm_mode = True
 
 
-class Follow(BaseModel):
+class FollowUser(BaseModel):
 
     result: bool
 
@@ -62,6 +58,38 @@ class Follow(BaseModel):
 
 
 class TweetDelete(BaseModel):
+
+    result: bool
+
+    class Config:
+        orm_mode = True
+
+
+class Author(BaseModel):
+    id: int
+    name: str
+
+class Likes(BaseModel):
+    user_id: int
+    name: str
+
+class TweetInfo(BaseModel):
+    id: int
+    content: str
+    attachments: list[str | None] = Field(default_factory=list)
+    author: list[Author] = Field(default_factory=list)
+    likes: list[Likes] = Field(default_factory=list)
+
+
+class TweetsByFollowing(BaseModel):
+
+    result: bool
+    tweets: list[TweetInfo] = Field(default_factory=list)
+
+    class Config:
+        orm_mode = True
+
+class DoUndoLike(BaseModel):
 
     result: bool
 

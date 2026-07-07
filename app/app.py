@@ -1,9 +1,9 @@
 from typing import Annotated
 from pathlib import Path
 import aiofiles
-from sqlalchemy import select, update, insert, delete, and_
+from sqlalchemy import select, update, insert, delete, and_, func
 from sqlalchemy.orm import selectinload
-from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow, TweetDelete
+from schemas import UserOut, TweetOut, TweetIn, MediaOut, DoUndoLike, MediaIn, Follow, FollowUser, TweetDelete, TweetsByFollowing, Likes, TweetInfo, Author
 from fastapi import FastAPI, Header, UploadFile
 from contextlib import asynccontextmanager
 from database import (
@@ -116,7 +116,7 @@ async def get_users_me(user_id: int):
     return data
 
 
-@app.post("/api/users/{id}/follow", response_model=Follow)
+@app.post("/api/users/{id}/follow", response_model=FollowUser)
 async def follow_user(api_key: Annotated[str, Header()], id: int):
     '''
     Эндпоинт на оформление подписки на пользователя
@@ -164,7 +164,7 @@ async def follow_user(api_key: Annotated[str, Header()], id: int):
     return data
 
 
-@app.delete("/api/users/{id}/follow", response_model=Follow)
+@app.delete("/api/users/{id}/follow", response_model=FollowUser)
 async def unfollow_user(api_key: Annotated[str, Header()], id: int):
     '''
     Эндпоинт на отписку от пользователя
@@ -212,7 +212,7 @@ async def unfollow_user(api_key: Annotated[str, Header()], id: int):
     return data
 
 
-@app.post("/api/tweets/{id}/likes", response_model=Follow)
+@app.post("/api/tweets/{id}/likes", response_model=DoUndoLike)
 async def send_like(api_key: Annotated[str, Header()], id: int):
     async with async_session() as session:
 
@@ -235,7 +235,7 @@ async def send_like(api_key: Annotated[str, Header()], id: int):
     return data
 
 
-@app.delete("/api/tweets/{id}/likes", response_model=Follow)
+@app.delete("/api/tweets/{id}/likes", response_model=DoUndoLike)
 async def send_like(api_key: Annotated[str, Header()], id: int):
     async with async_session() as session:
 
@@ -349,3 +349,59 @@ async def delete_tweet(api_key: Annotated[str, Header()], id: int):
 
     data = {"result": "true"}
     return data
+
+
+@app.get("/api/tweets", response_model=TweetsByFollowing)
+async def get_tweets(api_key: Annotated[str, Header()]):
+    async with async_session() as session:
+
+        # Получаем текущего пользователя
+        user_following_list = []
+        get_user = await session.execute(
+            select(User).options(selectinload(User.following)).where(
+                User.api_key == api_key)
+        )
+        user_me = get_user.scalars().first()
+        logger.info(f"Получены данные пользователя {user_me}")
+
+        following = [x.id for x in user_me.following]
+        logger.info(f"Получены подписки текущего пользователя {following}")
+
+        # Получаем твиты подписок пользователя
+        query = await session.execute(select(Twits,
+                                             func.count(Twits.likes).label("likes_count")).options(
+            selectinload(Twits.likes), selectinload(Twits.attachments),
+            selectinload(Twits.user_id)).where(
+            Twits.author.in_(following)
+        ).group_by(Twits).order_by("likes_count")
+        )
+        tweets = query.scalars().all()
+        logger.info(f"Получены твиты {tweets}")
+
+        tweets_list = []
+        collect_data = {}
+        for tweet in tweets:
+            collect_data["id"] = tweet.id,
+            collect_data["content"] = tweet.context,
+            collect_data["attachments"] = tweet.attachments,
+            collect_data["author"] = {"id": tweet.user_id.id,
+                                      "name": tweet.user_id.name},
+            collect_data["likes"] = [{"user_id": x.user_id,
+                                      "name": x.user_name} for x in tweet.likes]
+            tweets_list.append(collect_data)
+
+            logger.info(f"Собраны данные в словарь {collect_data}")
+        logger.info(f"Собраны данные {tweets_list}")
+
+Fh
+        data = {
+            "result": "true",
+            "tweets": tweets_list
+        }
+
+        return data
+
+
+
+
+

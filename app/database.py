@@ -49,6 +49,8 @@ class User(Base):
                                      back_populates='user_id_relationship',
                                      cascade='all, delete-orphan')
 
+    def __repr__(self) -> str:
+        return f'"id": {self.id}, "name": {self.name}'
 
 
 user_following = Table(
@@ -65,7 +67,6 @@ class Twits(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     context = Column(String, nullable=False)
     author = Column(Integer, ForeignKey('user.id'))
-    # attachment_ids = Column(Integer, ForeignKey('images.media_id'), nullable=True)
 
     # Связь с таблицей лайков
     likes = relationship('Likes', cascade='all, delete-orphan')
@@ -73,6 +74,10 @@ class Twits(Base):
     attachments = relationship('Images', back_populates='tweet', cascade='all, delete-orphan')
 
     user_id = relationship('User', back_populates='twits')
+
+    def __repr__(self) -> str:
+        return (f'"id": {self.id}, "context": {self.context}, "attachments": {self.attachments}, '
+                f'"author": {self.author}, "likes": {self.likes}')
 
 
 
@@ -93,6 +98,9 @@ class Likes(Base):
     # ID твита, на который поставили лайк
     tweet_id = Column(Integer, ForeignKey('twits.id'))
 
+    def __repr__(self) -> str:
+        return f'"user_id": {self.user_id}, "name": {self.user_name}'
+
 
 
 class Images(Base):
@@ -104,5 +112,8 @@ class Images(Base):
 
     # Связь с таблицей твитов
     tweet = relationship('Twits', back_populates='attachments')
+
+    def __repr__(self) -> str:
+        return f'{self.path}'
 
 

@@ -31,7 +31,8 @@ async def create_data():
 
             start_session.add_all([user_1, user_2, user_3, user_4])
 
-            user_4.followers = [user_1]
+            user_1.followers = [user_2, user_3]
+            user_1.following = [user_2, user_3]
 
             tweet_1 = Twits(context="Я помню чудное мгновенье", author=3)
             tweet_2 = Twits(context="Выхожу один я на дорогу", author=4)
@@ -77,6 +78,19 @@ async def form_data_for_user(result) -> dict:
             "name": result.name,
             "followers": [{"id": x.id, "name": x.name} for x in result.followers],
             "following": [{"id": x.id, "name": x.name} for x in result.following],
+        },
+    }
+    return data
+
+async def data_tweets(result):
+    data = {
+        "result": "true",
+        "tweets": {
+            "id": result.id,
+            "content": result.context,
+            "attachments": [x for x in result.attachments],
+            "author": {"id": result.author.id, "name": result.author.name},
+            "likes": [{"user_id": x.user_id, "name": x.user_name} for x in result.likes],
         },
     }
     return data
