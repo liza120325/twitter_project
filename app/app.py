@@ -333,7 +333,7 @@ async def delete_tweet(api_key: Annotated[str, Header()], id: int):
 
 
 @app.get("/api/medias/{media_id}")
-async def get_pictures(api_key: Annotated[str, Header()], media_id: int) -> FileResponse:
+async def get_pictures(media_id: int) -> FileResponse:
     async with async_session() as session:
 
         # Получаем путь к картинке
@@ -381,23 +381,6 @@ async def get_tweets(api_key: Annotated[str, Header()]):
         )
         tweets = query.scalars().all()
         logger.info(f"Получены твиты  {tweets}")
-
-
-        # Получаем твиты
-        # query = await session.execute(select(Twits,
-        #                                      func.count(Twits.likes).label("likes_count")).options(
-        #     selectinload(Twits.likes),
-        #               selectinload(Twits.attachments),
-        #               selectinload(Twits.user_id)).
-        #                               where(or_(
-        #                                     Twits.author.in_(following),
-        #                                     Twits.author == user_me.id)).
-        #                                         group_by(Twits).
-        #                                         order_by(func.count(Twits.likes).desc())
-        # )
-        # tweets = query.scalars().all()
-        # logger.info(f"Получены твиты  {tweets}")
-
 
         # Преобразуем полученные твиты
         tweets_list = []
