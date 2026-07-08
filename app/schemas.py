@@ -102,3 +102,7 @@ class SendMediaId(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class TweetId(BaseModel):
+    id: int

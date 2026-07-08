@@ -14,42 +14,57 @@ from database import (
     User,
     Likes,
     Twits,
-    user_following,
     Images
 )
 import logging
 
 
-async def create_data():
-    '''Функция наполняет Базу данных входными данными'''
+async def create_data() -> None:
+    '''
+    Функция наполняет базу данных первичной информацией
+    :return: None
+    '''
     async with async_session() as start_session:
         async with start_session.begin():
             user_1 = User(name="Harry Potter", api_key="test")
-            user_2 = User(name="Марина", api_key="tsvetaeva")
-            user_3 = User(name="Александр", api_key="pushkin")
-            user_4 = User(name="Михаил", api_key="lermontov")
+            user_2 = User(name="Hermione Granger", api_key="herm")
+            user_3 = User(name="Ron Weasley", api_key="ron")
+            user_4 = User(name="Albus Dumbledore", api_key="albus")
+            user_5 = User(name="Lord Voldemort", api_key="lord")
+            user_6 = User(name="Bellatrix Lestrange", api_key="bella")
+            user_7 = User(name="Minerva McGonagall", api_key="minerva")
 
-            start_session.add_all([user_1, user_2, user_3, user_4])
+            start_session.add_all([user_1, user_2, user_3, user_4, user_5, user_6, user_7])
 
             user_1.followers = [user_2, user_3]
-            user_1.following = [user_2, user_3]
+            user_1.following = [user_2, user_3, user_4, user_5, user_6, user_7]
+            user_2.following = [user_3, user_4, user_5]
+            user_6.following = [user_1, user_5]
+            user_4.followers = [user_1, user_2, user_3]
 
-            tweet_1 = Twits(context="Я помню чудное мгновенье", author=3)
-            tweet_2 = Twits(context="Выхожу один я на дорогу", author=4)
-            tweet_3 = Twits(context="Мне Нравится, что вы больны не мной", author=2)
-            tweet_4 = Twits(context="Сегодня чудесный день!", author=1)
+            tweet_1 = Twits(context="I am the chosen one", author=1)
+            tweet_2 = Twits(context="It is leviOsa, not leviosA", author=2)
+            tweet_3 = Twits(context="My dad works at the ministry of magic", author=3)
+            tweet_4 = Twits(context="Harry, you must find the horcruxes alone", author=4)
+            tweet_5 = Twits(context="Avadacedavra!", author=5)
+            tweet_6 = Twits(context="I killed Sirius Black", author=6)
+            tweet_7 = Twits(context="Protect Hogwarts!", author=7)
 
-            start_session.add_all([tweet_1, tweet_2, tweet_3, tweet_4])
+            start_session.add_all([tweet_1, tweet_2, tweet_3, tweet_4, tweet_5, tweet_6, tweet_7])
 
             like_1 = Likes(user_id=1, user_name="Harry Potter", tweet_id=1)
-            like_2 = Likes(user_id=2, user_name="Марина", tweet_id=1)
-            like_3 = Likes(user_id=4, user_name="Михаил", tweet_id=1)
+            like_2 = Likes(user_id=2, user_name="Hermione Granger", tweet_id=1)
+            like_3 = Likes(user_id=4, user_name="Albus Dumbledore", tweet_id=2)
 
             start_session.add_all([like_1, like_2, like_3])
 
 
 async def get_my_profile(api_key: Annotated[str, Header()]) -> User:
-    '''Функция по получению данных профиля текущего пользователя из базы данных'''
+    '''
+    Функция по получению профиля текущего пользователя
+    :param api_key: api_key текущего пользователя
+    :return: User
+    '''
     user = await session.execute(
         select(User)
         .where(User.api_key == api_key)
@@ -60,7 +75,11 @@ async def get_my_profile(api_key: Annotated[str, Header()]) -> User:
 
 
 async def get_any_user_profile(user_id) -> User:
-    '''Функция по получению данных профиля любого пользователя из базы данных'''
+    '''
+    Функция по получению информации о профиле любого пользователя
+    :param user_id: ID пользователя, информацию о профиле которого хотим получить
+    :return: User
+    '''
     user = await session.execute(
         select(User)
         .where(User.id == user_id)
@@ -71,6 +90,11 @@ async def get_any_user_profile(user_id) -> User:
 
 
 async def form_data_for_user(result) -> dict:
+    '''
+    Функция формирует словарь для отправки данных страницы пользователя
+    :param result: объект класса User
+    :return: data = {User}
+    '''
     data = {
         "result": "true",
         "user": {
@@ -81,4 +105,17 @@ async def form_data_for_user(result) -> dict:
         },
     }
     return data
+
+
+async def get_following_user_profile(user_id) -> User:
+    get_following = await session.execute(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.following), selectinload(User.followers))
+    )
+    user_following = get_following.scalars().first()
+    return user_following
+
+
+
 
