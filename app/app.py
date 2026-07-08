@@ -1,10 +1,11 @@
 from typing import Annotated
 from pathlib import Path
 import aiofiles
-from sqlalchemy import select, update, insert, delete, and_, func
+from sqlalchemy import select, update, insert, delete, and_, func, or_
 from sqlalchemy.orm import selectinload
-from schemas import UserOut, TweetOut, TweetIn, MediaOut, DoUndoLike, MediaIn, Follow, FollowUser, TweetDelete, TweetsByFollowing, Likes, TweetInfo, Author
+from schemas import UserOut, TweetOut, TweetIn, MediaOut, DoUndoLike, SendMediaId, MediaIn, Follow, FollowUser, TweetDelete, TweetsByFollowing, Likes, TweetInfo, Author
 from fastapi import FastAPI, Header, UploadFile
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from database import (
     engine,
@@ -351,12 +352,25 @@ async def delete_tweet(api_key: Annotated[str, Header()], id: int):
     return data
 
 
+@app.get("/api/medias/{media_id}")
+async def get_pictures(api_key: Annotated[str, Header()], media_id: int) -> FileResponse:
+    async with async_session() as session:
+
+        # Получаем путь к картинке
+        get_picture_path = await session.execute(select(Images.path).where(
+            Images.media_id == media_id))
+        image_path = get_picture_path.scalars().first()
+
+        return FileResponse(image_path)
+
+
+
+
 @app.get("/api/tweets", response_model=TweetsByFollowing)
 async def get_tweets(api_key: Annotated[str, Header()]):
     async with async_session() as session:
 
         # Получаем текущего пользователя
-        user_following_list = []
         get_user = await session.execute(
             select(User).options(selectinload(User.following)).where(
                 User.api_key == api_key)
@@ -367,37 +381,65 @@ async def get_tweets(api_key: Annotated[str, Header()]):
         following = [x.id for x in user_me.following]
         logger.info(f"Получены подписки текущего пользователя {following}")
 
-        # Получаем твиты подписок пользователя
-        query = await session.execute(select(Twits,
-                                             func.count(Twits.likes).label("likes_count")).options(
-            selectinload(Twits.likes), selectinload(Twits.attachments),
-            selectinload(Twits.user_id)).where(
-            Twits.author.in_(following)
-        ).group_by(Twits).order_by("likes_count")
+        likes_subquery = (
+            select(func.count(Likes.id))
+            .where(Likes.tweet_id == Twits.id)
+            .correlate(Twits)
+            .scalar_subquery()
+        )
+
+        # Получаем твиты
+        query = await session.execute(
+            select(Twits,likes_subquery.label("likes_count"))
+            .options(
+            selectinload(Twits.likes),
+                      selectinload(Twits.attachments),
+                      selectinload(Twits.user_id))
+            .where(or_(Twits.author.in_(following),
+                       Twits.author == user_me.id))
+            .order_by(likes_subquery.desc())
         )
         tweets = query.scalars().all()
-        logger.info(f"Получены твиты {tweets}")
+        logger.info(f"Получены твиты  {tweets}")
 
+
+        # Получаем твиты
+        # query = await session.execute(select(Twits,
+        #                                      func.count(Twits.likes).label("likes_count")).options(
+        #     selectinload(Twits.likes),
+        #               selectinload(Twits.attachments),
+        #               selectinload(Twits.user_id)).
+        #                               where(or_(
+        #                                     Twits.author.in_(following),
+        #                                     Twits.author == user_me.id)).
+        #                                         group_by(Twits).
+        #                                         order_by(func.count(Twits.likes).desc())
+        # )
+        # tweets = query.scalars().all()
+        # logger.info(f"Получены твиты  {tweets}")
+
+
+        # Преобразуем полученные твиты
         tweets_list = []
-        collect_data = {}
         for tweet in tweets:
-            collect_data["id"] = tweet.id,
-            collect_data["content"] = tweet.context,
-            collect_data["attachments"] = tweet.attachments,
-            collect_data["author"] = {"id": tweet.user_id.id,
-                                      "name": tweet.user_id.name},
-            collect_data["likes"] = [{"user_id": x.user_id,
-                                      "name": x.user_name} for x in tweet.likes]
-            tweets_list.append(collect_data)
+            twit = {
+                "id": tweet.id,
+                "content": tweet.context,
+                "attachments": [f'/api/medias/{media.media_id}' for media in tweet.attachments],
+                "author": {"id": tweet.user_id.id,
+                                  "name": tweet.user_id.name},
+                "likes": [{"user_id": x.user_id,
+                                  "name": x.user_name} for x in tweet.likes]
+            }
+            logger.info(f"Собраны данные одного твита  {twit}")
+            tweets_list.append(twit)
+        logger.info(f"Собраны общие данные {tweets_list}")
 
-            logger.info(f"Собраны данные в словарь {collect_data}")
-        logger.info(f"Собраны данные {tweets_list}")
 
         data = {
             "result": "true",
             "tweets": tweets_list
         }
-
         return data
 
 

@@ -82,15 +82,3 @@ async def form_data_for_user(result) -> dict:
     }
     return data
 
-async def data_tweets(result):
-    data = {
-        "result": "true",
-        "tweets": {
-            "id": result.id,
-            "content": result.context,
-            "attachments": [x for x in result.attachments],
-            "author": {"id": result.author.id, "name": result.author.name},
-            "likes": [{"user_id": x.user_id, "name": x.user_name} for x in result.likes],
-        },
-    }
-    return data

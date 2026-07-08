@@ -77,7 +77,7 @@ class TweetInfo(BaseModel):
     id: int
     content: str
     attachments: list[str | None] = Field(default_factory=list)
-    author: list[Author] = Field(default_factory=list)
+    author: Author
     likes: list[Likes] = Field(default_factory=list)
 
 
@@ -92,6 +92,13 @@ class TweetsByFollowing(BaseModel):
 class DoUndoLike(BaseModel):
 
     result: bool
+
+    class Config:
+        orm_mode = True
+
+class SendMediaId(BaseModel):
+
+    media_id: str
 
     class Config:
         orm_mode = True
