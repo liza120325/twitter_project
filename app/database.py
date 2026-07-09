@@ -96,7 +96,7 @@ class Likes(Base):
                                         back_populates='like_from_user_id')
 
     # ID твита, на который поставили лайк
-    tweet_id = Column(Integer, ForeignKey('twits.id'))
+    tweet_id = Column(Integer, ForeignKey('twits.id', ondelete='CASCADE'))
 
     def __repr__(self) -> str:
         return f'"user_id": {self.user_id}, "name": {self.user_name}'
@@ -104,6 +104,7 @@ class Likes(Base):
 
 
 class Images(Base):
+    '''Модель картинок к твиту'''
     __tablename__ = 'images'
 
     media_id = Column(Integer, primary_key=True, autoincrement=True)

@@ -2,7 +2,6 @@ from typing import Annotated
 from pathlib import Path
 import aiofiles
 from sqlalchemy import select, update, insert, delete, and_, func, or_
-from sqlalchemy.orm import selectinload
 from schemas import UserOut, TweetOut, TweetIn, MediaOut, DoUndoLike, TweetId, MediaIn, Follow, FollowUser, TweetDelete, TweetsByFollowing, Likes, TweetInfo, Author
 from fastapi import FastAPI, Header, UploadFile
 from fastapi.responses import FileResponse
@@ -18,7 +17,9 @@ from database import (
 )
 import logging
 from crud import (create_data, get_my_profile, get_any_user_profile, form_data_for_user,
-                  get_following_user_profile)
+                form_path_for_media, update_tweet_id_in_images, add_new_tweet, add_following,
+                  send_like_for_tweet, delete_like_from_tweet, delete_following, get_list_of_tweets,
+                  collect_data_for_tweets, deleting_tweet)
 
 logger = logging.getLogger("logger_for_app")
 logging.basicConfig(level=logging.DEBUG, filename="fastapi.log")
@@ -38,30 +39,23 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/api/users/me", response_model=UserOut)
-async def get_users_me(api_key: Annotated[str, Header()]):
+async def get_users_me(api_key: Annotated[str, Header()]) -> dict:
     '''
-    Эндпоинт по получению информации о профиле текущего пользователя
+    Эндпоинт по получению информации о профиле текущего пользователя.
     :param api_key: api_key текущего пользователя
     :return: объект класса User
     '''
     async with async_session() as session:
-
-        try:
-            result = await get_my_profile(api_key)
-
-        except Exception as ex:
-            return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-                    f"'error_message': {str(ex)}")
-
+        result = await get_my_profile(api_key)
         data = await form_data_for_user(result)
 
     return data
 
 
 @app.get("/api/users/{user_id}", response_model=UserOut)
-async def get_users_me(user_id: int):
+async def get_users_any(user_id: int) -> dict:
     '''
-    Эндпоинт по получению информации о профиле конкретного пользователя
+    Эндпоинт по получению информации о профиле конкретного пользователя.
     :param user_id: ID пользователя, информацию о профиле которого хотим получить
     :return: объект класса User
     '''
@@ -82,50 +76,29 @@ async def follow_user(api_key: Annotated[str, Header()], id: int) -> dict | str:
     '''
     async with async_session() as session:
 
-        # Получаем текущего пользователя
-        get_user = await session.execute(
-            select(User)
-            .where(User.api_key == api_key)
-            .options(selectinload(User.following), selectinload(User.followers))
-        )
-        user_me = get_user.scalars().first()
-        #user_me = await get_my_profile(api_key)
+        user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
-        # Получаем пользователя, на которого подписываемся
-        get_following = await session.execute(
-            select(User)
-            .where(User.id == id)
-            .options(selectinload(User.following), selectinload(User.followers))
-        )
-        user_following = get_following.scalars().first()
-        #user_following = await get_following_user_profile(id)
+        user_following = await get_any_user_profile(id)
         logger.info(f"Получен пользователь, на которого подписываемся {user_following}")
 
-        # Проверяем, подписан ли текущий пользователь на выбранного
         logger.info("Проверяем подписку")
-        #check = user_following in user_me.following
         check = user_following in user_me.following
 
         if not check:
             logger.info("Пользователь не подписан")
-            try:
-                # Оформляем подписку
-                user_me.following.append(user_following)
-                logger.info("Подписка оформлена")
-                await session.commit()
+            following = await add_following(user_me, user_following)
+            logger.info("Подписка оформлена")
+        else:
+            raise Exception(f"'result': 'false', 'error_type': {type(Exception).__name__}, "
+                    f"'error_message': {str(Exception)}")
 
-            except Exception as ex:
-                return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-                        f"'error_message': {str(ex)}")
-
-        # await session.commit()
     data = {"result": "true"}
     return data
 
 
 @app.delete("/api/users/{id}/follow", response_model=FollowUser)
-async def unfollow_user(api_key: Annotated[str, Header()], id: int):
+async def unfollow_user(api_key: Annotated[str, Header()], id: int) -> dict | str:
     '''
     Эндпоинт на отписку от пользователя
     :param api_key: api_key текущего пользователя
@@ -134,50 +107,33 @@ async def unfollow_user(api_key: Annotated[str, Header()], id: int):
     '''
     async with async_session() as session:
 
-        # Получаем текущего пользователя
-        get_user = await session.execute(
-            select(User)
-            .where(User.api_key == api_key)
-            .options(selectinload(User.following), selectinload(User.followers))
-        )
-        user_me = get_user.scalars().first()
-        logger.info("Получен текущий пользователь")
+        user_me = await get_my_profile(api_key)
+        logger.info(f"Получен текущий пользователь {user_me}")
 
-        # Получаем пользователя, от которого отписываемся
-        get_following = await session.execute(
-            select(User)
-            .where(User.id == id)
-            .options(selectinload(User.following), selectinload(User.followers))
-        )
-        user_following = get_following.scalars().first()
-        logger.info("Получен пользователь, от которого отписываемся")
+        user_following = await get_any_user_profile(id)
+        logger.info(f"Получен пользователь, от которого отписываемся {user_following}")
 
         # Проверяем, подписан ли текущий пользователь на того, от кого он хочет отписаться
         logger.info("Проверяем, подписан ли текущий пользователь на того, от кого он хочет отписаться")
         check = user_following in user_me.following
 
         if check:
-            logger.info("Отписываемся")
-            try:
-                # Отписываемся
-                user_me.following.remove(user_following)
-                logger.info("Вы успешно отписались")
+            unfollowing = await delete_following(user_me, user_following)
+            logger.info("Успешно отписались")
+        else:
+            raise Exception(f"'result': 'false', 'error_type': {type(Exception).__name__}, "
+                    f"'error_message': {str(Exception)}")
 
-            except Exception as ex:
-                return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-                        f"'error_message': {str(ex)}")
-
-        await session.commit()
     data = {"result": "true"}
     return data
 
 
 @app.post("/api/tweets/{id}/likes", response_model=DoUndoLike)
-async def send_like(api_key: Annotated[str, Header()], id: int) -> dict | str:
+async def send_like(api_key: Annotated[str, Header()], id: int) -> dict:
     '''
     Эндпоинт ставит лайк на твит.
-    :param api_key: api_key текущего пользователя
-    :param id: ID твита, на который ставится лайк
+    :param api_key: api_key текущего пользователя.
+    :param id: ID твита, на который ставится лайк.
     :return: data = {"result": "true"}
     '''
     async with async_session() as session:
@@ -186,61 +142,44 @@ async def send_like(api_key: Annotated[str, Header()], id: int) -> dict | str:
         user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
-        # Добавляем ID и Имя пользователя, ID твита в таблицу лайков
-        add_like = await session.execute(insert(Likes).values(user_id=user_me.id,
-                                                              user_name=user_me.name,
-                                                              tweet_id=id))
-        logger.info("Лайк поставлен")
-        await session.commit()
+        like = await send_like_for_tweet(user_me, id)
+        logger.info(f"Добавлены ID и Имя пользователя, ID твита в таблицу лайков")
 
     data = {"result": "true"}
     return data
 
 
 @app.delete("/api/tweets/{id}/likes", response_model=DoUndoLike)
-async def unsend_like(api_key: Annotated[str, Header()], id: int) -> dict | str:
+async def unsend_like(api_key: Annotated[str, Header()], id: int) -> dict:
     '''
-    Эндпоинт по удалению лайка с твита
-    :param api_key: api_key текущего пользователя
-    :param id: ID твита, у которого удаляется лайк
+    Эндпоинт по удалению лайка с твита.
+    :param api_key: api_key текущего пользователя.
+    :param id: ID твита, у которого удаляется лайк.
     :return: data = {"result": "true"}
     '''
     async with async_session() as session:
 
-        # Получаем ID пользователя, который убирает лайк
         user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
-        # Удаляем ID твита из таблицы лайков
-        try:
-            delete_like = await session.execute(delete(Likes).where(and_(Likes.tweet_id == id,
-                                                                         Likes.user_id == user_me.id)))
-            logger.info("Лайк удален")
-            await session.commit()
-
-        except Exception as ex:
-            return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-                    f"'error_message': {str(ex)}")
+        deleting_like = await delete_like_from_tweet(user_me, id)
+        logger.info(f"Лайк удален")
 
     data = {"result": "true"}
     return data
 
 
 @app.post("/api/medias", response_model=MediaOut)
-async def post_new_media(api_key: Annotated[str, Header()], file: UploadFile) -> dict | str:
+async def post_new_media(api_key: Annotated[str, Header()], file: UploadFile) -> dict:
     '''
-    Эндпоинт сохраняет картинки в базу данных
-    :param api_key: api_key текущего пользователя
-    :param file: картинка к твиту
-    :return: присвоенный ID отправленной картинки
+    Эндпоинт сохраняет картинки в базу данных.
+    :param api_key: api_key текущего пользователя.
+    :param file: картинка к твиту.
+    :return: присвоенный ID отправленной картинки.
     '''
     # Сохранить файл
-    #directory = Path("media")
-    directory = Path("../static/media")
-    directory.mkdir(parents=True, exist_ok=True)
+    file_path = await form_path_for_media(file)
     contents = file.file.read()
-    file_path = directory / f'{file.filename}'
-    logger.info(f"Путь для сохранения файла {file_path}")
 
     async with aiofiles.open(str(file_path), mode="wb") as f:
         await f.write(contents)
@@ -253,19 +192,18 @@ async def post_new_media(api_key: Annotated[str, Header()], file: UploadFile) ->
         session.add(new_file)
         await session.commit()
 
-        #return {"result": "true", "media_id": new_file.media_id}
     data = {"result": "true", "media_id": new_file.media_id}
     return data
 
 
 @app.post("/api/tweets", response_model=TweetOut)
 async def post_new_tweet(api_key: Annotated[str, Header()],
-                          tweet: TweetIn):
+                          tweet: TweetIn) -> dict:
     '''
-    Эндпоинт на публикацию нового твита
-    :param api_key: api_key текущего пользователя
-    :param tweet: твит от пользователя
-    :return: присвоенный ID отправленному твиту
+    Эндпоинт на публикацию нового твита.
+    :param api_key: api_key текущего пользователя.
+    :param tweet: твит от пользователя.
+    :return: присвоенный ID отправленному твиту.
     '''
     tweet_context = tweet.tweet_data
     tweet_images = tweet.tweet_media_ids
@@ -273,60 +211,52 @@ async def post_new_tweet(api_key: Annotated[str, Header()],
     async with async_session() as session:
 
         # Получаем автора твита
-        get_user = await session.execute(
-            select(User.id).where(User.api_key == api_key)
-        )
-        user_me = get_user.scalars().first()
+        user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
         # Добавляем новый твит
-        stmt = (insert(Twits).values(context=tweet_context, author=user_me).returning(Twits.id))
-        result = await session.execute(stmt)
-
-        new_tweet_id = result.scalar()
+        new_tweet_id = await add_new_tweet(tweet_context, user_me)
         logger.info(f"Твит добавлен в БД")
 
         # Добавляем изображение к новому твиту
         if tweet_images:
             logger.info(f"Твит содержит картинку")
-
-            # ОБновляем в таблице изображений ID твита
-            update_tweet_id = await session.execute(update(Images).where(
-                Images.media_id == tweet_images[0]).values(tweet_id=new_tweet_id))
-            logger.info(f"в таблице изображений ID твита обновлен")
-
-            await session.commit()
-            logger.info(f"Обновлена инфо в БД в таблице Изображений, присвоен ID твита")
-
+            update_info = await update_tweet_id_in_images(tweet_images, new_tweet_id)
             return {"result": "true", "tweet_id": new_tweet_id}
 
         else:
-            await session.commit()
             return {"result": "true", "tweet_id": new_tweet_id}
 
 
 @app.delete("/api/tweets/{id}", response_model=TweetDelete)
-async def delete_tweet(api_key: Annotated[str, Header()], id: int):
-
+async def delete_tweet(api_key: Annotated[str, Header()], id: int) -> dict | str:
+    '''
+    Эндпоинт на удаление твита.
+    :param api_key: api_key текущего пользователя.
+    :param id: ID удаляемого твита
+    :return: data = {"result": "true"}
+    '''
     async with async_session() as session:
         # Получаем текущего пользователя
-        get_user = await session.execute(
-            select(User.id).where(User.api_key == api_key)
-        )
-        user_me = get_user.scalars().first()
+        # get_user = await session.execute(
+        #     select(User.id).where(User.api_key == api_key)
+        # )
+        # user_me = get_user.scalars().first()
+        user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
         # Удаляем твит
-        try:
-            tweet_delete = await session.execute(delete(Twits).where(and_(Twits.author == user_me,
-                                                                          Twits.id == id)))
-            await session.commit()
-            logger.info('Твит удален')
-
-        except Exception as ex:
-            logger.info('Нельзя удалить чужой твит')
-            return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-                    f"'error_message': {str(ex)}")
+        # try:
+        #     tweet_delete = await session.execute(delete(Twits).where(and_(Twits.author == user_me,
+        #                                                                   Twits.id == id)))
+        #     await session.commit()
+        #     logger.info('Твит удален')
+        #
+        # except Exception as ex:
+        #     return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
+        #             f"'error_message': {str(ex)}")
+        deleting = await deleting_tweet(user_me, id)
+        logger.info(f"Твит удален")
 
     data = {"result": "true"}
     return data
@@ -334,9 +264,12 @@ async def delete_tweet(api_key: Annotated[str, Header()], id: int):
 
 @app.get("/api/medias/{media_id}")
 async def get_pictures(media_id: int) -> FileResponse:
+    '''
+    Эндпоинт на отдачу картинки твита
+    :param media_id: ID картинки
+    :return: FileResponse
+    '''
     async with async_session() as session:
-
-        # Получаем путь к картинке
         get_picture_path = await session.execute(select(Images.path).where(
             Images.media_id == media_id))
         image_path = get_picture_path.scalars().first()
@@ -344,60 +277,20 @@ async def get_pictures(media_id: int) -> FileResponse:
         return FileResponse(image_path)
 
 
-
-
 @app.get("/api/tweets", response_model=TweetsByFollowing)
-async def get_tweets(api_key: Annotated[str, Header()]):
+async def get_tweets(api_key: Annotated[str, Header()]) -> dict:
     async with async_session() as session:
-
-        # Получаем текущего пользователя
-        get_user = await session.execute(
-            select(User).options(selectinload(User.following)).where(
-                User.api_key == api_key)
-        )
-        user_me = get_user.scalars().first()
-        logger.info(f"Получены данные пользователя {user_me}")
+        user_me = await get_my_profile(api_key)
+        logger.info(f"Получен текущий пользователь {user_me}")
 
         following = [x.id for x in user_me.following]
         logger.info(f"Получены подписки текущего пользователя {following}")
 
-        likes_subquery = (
-            select(func.count(Likes.id))
-            .where(Likes.tweet_id == Twits.id)
-            .correlate(Twits)
-            .scalar_subquery()
-        )
-
-        # Получаем твиты
-        query = await session.execute(
-            select(Twits,likes_subquery.label("likes_count"))
-            .options(
-            selectinload(Twits.likes),
-                      selectinload(Twits.attachments),
-                      selectinload(Twits.user_id))
-            .where(or_(Twits.author.in_(following),
-                       Twits.author == user_me.id))
-            .order_by(likes_subquery.desc())
-        )
-        tweets = query.scalars().all()
+        tweets = await get_list_of_tweets(user_me, following)
         logger.info(f"Получены твиты  {tweets}")
 
-        # Преобразуем полученные твиты
-        tweets_list = []
-        for tweet in tweets:
-            twit = {
-                "id": tweet.id,
-                "content": tweet.context,
-                "attachments": [f'/api/medias/{media.media_id}' for media in tweet.attachments],
-                "author": {"id": tweet.user_id.id,
-                                  "name": tweet.user_id.name},
-                "likes": [{"user_id": x.user_id,
-                                  "name": x.user_name} for x in tweet.likes]
-            }
-            logger.info(f"Собраны данные одного твита  {twit}")
-            tweets_list.append(twit)
-        logger.info(f"Собраны общие данные {tweets_list}")
-
+        tweets_list = await collect_data_for_tweets(tweets)
+        logger.info(f"Преобразованы данные для отправки")
 
         data = {
             "result": "true",
