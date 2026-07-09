@@ -237,24 +237,9 @@ async def delete_tweet(api_key: Annotated[str, Header()], id: int) -> dict | str
     :return: data = {"result": "true"}
     '''
     async with async_session() as session:
-        # Получаем текущего пользователя
-        # get_user = await session.execute(
-        #     select(User.id).where(User.api_key == api_key)
-        # )
-        # user_me = get_user.scalars().first()
         user_me = await get_my_profile(api_key)
         logger.info(f"Получен текущий пользователь {user_me}")
 
-        # Удаляем твит
-        # try:
-        #     tweet_delete = await session.execute(delete(Twits).where(and_(Twits.author == user_me,
-        #                                                                   Twits.id == id)))
-        #     await session.commit()
-        #     logger.info('Твит удален')
-        #
-        # except Exception as ex:
-        #     return (f"'result': 'false', 'error_type': {type(ex).__name__}, "
-        #             f"'error_message': {str(ex)}")
         deleting = await deleting_tweet(user_me, id)
         logger.info(f"Твит удален")
 
