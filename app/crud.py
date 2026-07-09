@@ -1,11 +1,8 @@
 from typing import Annotated
 from pathlib import Path
-import aiofiles
 from sqlalchemy import select, update, insert, delete, and_, func, or_
 from sqlalchemy.orm import selectinload
-from schemas import UserOut, TweetOut, TweetIn, MediaOut, MediaIn, Follow
 from fastapi import FastAPI, Header, UploadFile
-from contextlib import asynccontextmanager
 from database import (
     engine,
     async_session,
@@ -16,7 +13,6 @@ from database import (
     Twits,
     Images
 )
-import logging
 
 
 async def create_data() -> None | str:
