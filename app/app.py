@@ -21,6 +21,7 @@ from crud import (create_data, get_my_profile, get_any_user_profile, form_data_f
                   send_like_for_tweet, delete_like_from_tweet, delete_following, get_list_of_tweets,
                   collect_data_for_tweets, deleting_tweet)
 
+
 logger = logging.getLogger("logger_for_app")
 logging.basicConfig(level=logging.DEBUG, filename="fastapi.log")
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
