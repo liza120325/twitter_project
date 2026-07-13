@@ -19,6 +19,11 @@ session = async_session()
 Base = declarative_base()
 
 
+async def get_db():
+    async with async_session() as as_session:
+        yield as_session
+
+
 class User(Base):
     '''Модель пользователя'''
     __tablename__ = 'user'
