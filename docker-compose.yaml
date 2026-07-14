@@ -16,7 +16,7 @@ services:
     networks:
       - app-network
     volumes:
-      - ./app:/app
+      - ./my_app:/fastapi_app/my_app
       - ./static/media:/static/media
 
 

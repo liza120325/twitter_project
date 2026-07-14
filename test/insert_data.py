@@ -1,6 +1,6 @@
 from sqlalchemy import insert
 
-from app.database import User, Twits, Likes, user_following, Images # Импорты вашей базы
+from my_app.database import User, Twits, Likes, user_following, Images # Импорты вашей базы
 
 user_data = [
     {"name": "Frodo Baggins", "api_key": "hobbit"},

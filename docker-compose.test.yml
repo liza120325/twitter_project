@@ -1,43 +1,48 @@
 services:
 
   # Тестовая база данных
-  test_db:
+  test_database:
+    container_name: test_database
     image: postgres
     environment:
-      POSTGRES_USER: test_user
-      POSTGRES_PASSWORD: test_password
-      POSTGRES_DB: my_app_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_DB=my_app_test
     # Мапим на случайный или другой порт, чтобы не конфликтовать с основной БД
     ports:
       - "5433:5432"
     networks:
-      - app-network
+      - test-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test_user -d my_app_test"]
+      test: ["CMD", "pg_isready", "-U", "test_user", "-d", "my_app_test"]
       interval: 5s
       timeout: 5s
       retries: 5
 
 
   # Контейнер, который будет запускать pytest
-  test_runner:
+  test_app:
+    container_name: test_app
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - .:/app
     # Перезаписываем стандартную команду запуска FastAPI на запуск тестов
-    command: pytest test/
+    command: pytest
     networks:
-      - app-network
+      - test-network
+    volumes:
+      - ./my_app:/fastapi_app/my_app/
+      - ./test:/fastapi_app/my_app/test
     environment:
-      # Указываем URL тестовой базы. Имя хоста совпадает с именем сервиса — test_db
-      DATABASE_URL: postgresql+asyncpg://test_user:test_password@test_db:5432/my_app_test
+      # Указываем URL тестовой базы. Имя хоста совпадает с именем сервиса — test_database
+      - DATABASE_URL=postgresql+asyncpg://test_user:test_password@test_database:5432/my_app_test
+      - PYTHONPATH=./fastapi_app/my_app:.
+      - BASE_URL=http://test
     depends_on:
-      test_db:
+      test_database:
         condition: service_healthy # Ждем, пока база данных полностью загрузится
 
 
 networks:
-  app-network:
+  test-network:
     driver: bridge
