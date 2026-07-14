@@ -1,5 +1,10 @@
 import json
-
+from typing import Annotated
+from sqlalchemy import select, update, insert, delete, and_, func, or_
+from sqlalchemy.orm import selectinload
+from my_app.database import Base, get_db, async_session, User, Twits, Likes
+from fastapi import Header
+from my_app.crud import get_my_profile
 import pytest
 
 CONTENT_TYPE = "Content-Type"
@@ -7,7 +12,15 @@ APP_JSON = "application/json"
 
 
 @pytest.mark.asyncio
-async def test_get_me(client):
+async def test_func_get_my_profile(db_session):
+    api_key: Annotated[str, Header()] = 'hobbit'
+    user_profile = await get_my_profile(api_key, db_session)
+    assert user_profile.name == 'Frodo Baggins'
+
+
+
+@pytest.mark.asyncio
+async def test_get_me(client, db_session):
     query_parameters = {"api-key": "hobbit"}
     response = await client.get('/api/users/me', headers=query_parameters)
     data = response.json()
@@ -23,6 +36,8 @@ async def test_get_me(client):
             "following": [{"id": 2, "name": 'Legolas Greenleaf'}],
         },
     }
+
+
 
 
 # @pytest.mark.asyncio

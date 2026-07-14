@@ -47,7 +47,7 @@ async def get_users_me(api_key: Annotated[str, Header()]) -> dict:
     :return: объект класса User
     '''
     async with async_session() as session:
-        result = await get_my_profile(api_key)
+        result = await get_my_profile(api_key, session)
         data = await form_data_for_user(result)
 
     return data

@@ -60,14 +60,14 @@ async def create_data() -> None | str:
                         f"'error_message': {str(ex)}")
 
 
-async def get_my_profile(api_key: Annotated[str, Header()]) -> User | str:
+async def get_my_profile(api_key: Annotated[str, Header()], cur_session) -> User | str:
     '''
     Функция по получению профиля текущего пользователя
     :param api_key: api_key текущего пользователя
     :return: User
     '''
     try:
-        user = await session.execute(
+        user = await cur_session.execute(
         select(User)
         .where(User.api_key == api_key)
         .options(selectinload(User.following), selectinload(User.followers))

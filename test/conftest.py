@@ -49,3 +49,23 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest_asyncio.fixture()
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Создает изолированную сессию БД для теста.
+    Все изменения откатываются (ROLLBACK) после завершения теста.
+    """
+    connection = await test_engine.connect()
+    transaction = await connection.begin()
+
+    # Связываем сессию с текущим соединением и транзакцией
+    session = test_async_session(bind=connection)
+
+    yield session
+
+    # Закрываем сессию и откатываем все изменения
+    await session.close()
+    await transaction.rollback()
+    await connection.close()
