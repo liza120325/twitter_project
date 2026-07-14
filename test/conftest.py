@@ -5,7 +5,7 @@ import pytest
 import os
 import sys
 import asyncio
-
+from unittest.mock import patch, AsyncMock
 import pytest_asyncio
 from sqlalchemy import create_engine, NullPool
 from httpx import AsyncClient, ASGITransport
@@ -69,3 +69,21 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     await session.close()
     await transaction.rollback()
     await connection.close()
+
+
+
+@pytest_asyncio.fixture()
+def mock_async_session(db_session):
+    """
+    Фикстура перехватывает контекстный менеджер async_session()
+    и подставляет вместо него тестовую сессию db_session.
+    """
+    # 1. Создаем мок для контекстного менеджера `async with`
+    mock_cm = AsyncMock()
+    # 2. Указываем, что при входе в контекст (as session) возвращается db_session
+    mock_cm.__aenter__.return_value = db_session
+
+    # 3. Запускаем патч на время работы теста
+    # Замените 'app.main.async_session' на ваш реальный путь к эндпоинту!
+    with patch("my_app.app.async_session", return_value=mock_cm) as mocked_factory:
+        yield mocked_factory  # Передаем управление тесту

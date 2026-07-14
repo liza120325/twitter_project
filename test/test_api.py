@@ -20,20 +20,20 @@ async def test_func_get_my_profile(db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_me(client, db_session):
+async def test_get_me(client, db_session, mock_async_session):
     query_parameters = {"api-key": "hobbit"}
     response = await client.get('/api/users/me', headers=query_parameters)
     data = response.json()
     print(data)
     assert response.status_code == 200
     assert data == {
-        "result": "true",
+        "result": True,
         "user": {
             "id": 1,
             "name": 'Frodo Baggins',
-            "followers": [{"id": 2, "name": 'Legolas Greenleaf'},
+            "followers": [{"id": 2, "name": 'Legolas Greenleaf'}],
+            "following": [{"id": 2, "name": 'Legolas Greenleaf'},
                           {"id": 3, "name": 'Gandalf the Grey'}],
-            "following": [{"id": 2, "name": 'Legolas Greenleaf'}],
         },
     }
 
