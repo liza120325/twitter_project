@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field
 
+
 class Follow(BaseModel):
     id: int
     name: str
+
 
 class User(BaseModel):
     id: int
@@ -69,9 +71,11 @@ class Author(BaseModel):
     id: int
     name: str
 
+
 class Likes(BaseModel):
     user_id: int
     name: str
+
 
 class TweetInfo(BaseModel):
     id: int
@@ -89,12 +93,14 @@ class TweetsByFollowing(BaseModel):
     class Config:
         orm_mode = True
 
+
 class DoUndoLike(BaseModel):
 
     result: bool
 
     class Config:
         orm_mode = True
+
 
 class SendMediaId(BaseModel):
 
