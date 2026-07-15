@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import aiofiles
-from fastapi import FastAPI, Header, UploadFile
+from fastapi import FastAPI, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+from starlette import status
 
 from crud import (
     add_following,
@@ -279,6 +280,12 @@ async def get_pictures(media_id: int) -> FileResponse:
             select(Images.path).where(Images.media_id == media_id)
         )
         image_path = get_picture_path.scalars().first()
+
+        if image_path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Файл не найден или путь не указан"
+            )
 
         return FileResponse(image_path)
 

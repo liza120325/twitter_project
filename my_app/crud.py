@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Header
 from sqlalchemy import and_, delete, func, insert, or_, select, update
@@ -61,6 +61,7 @@ async def create_data() -> None | str:
                     f"'result': 'false', 'error_type': {type(ex).__name__}, "
                     f"'error_message': {str(ex)}"
                 )
+    return None
 
 
 async def get_my_profile(api_key: Annotated[str, Header()], cur_session) -> User | str:
@@ -159,7 +160,7 @@ async def update_tweet_id_in_images(
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
-
+    return None
 
 async def add_new_tweet(tweet_context, user_me, cur_session) -> None | str:
     """
@@ -204,7 +205,7 @@ async def deleting_tweet(user_me, id, cur_session) -> None | str:
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
-
+    return None
 
 async def add_following(user_me, user_following, cur_session) -> None | str:
     """
@@ -223,6 +224,7 @@ async def add_following(user_me, user_following, cur_session) -> None | str:
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
+    return None
 
 
 async def delete_following(user_me, user_following, cur_session) -> None | str:
@@ -241,7 +243,7 @@ async def delete_following(user_me, user_following, cur_session) -> None | str:
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
-
+    return None
 
 async def send_like_for_tweet(user_me, id, cur_session) -> None | str:
     """
@@ -263,7 +265,7 @@ async def send_like_for_tweet(user_me, id, cur_session) -> None | str:
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
-
+    return None
 
 async def delete_like_from_tweet(user_me, id, cur_session) -> None | str:
     """
@@ -283,7 +285,7 @@ async def delete_like_from_tweet(user_me, id, cur_session) -> None | str:
             f"'result': 'false', 'error_type': {type(ex).__name__}, "
             f"'error_message': {str(ex)}"
         )
-
+    return None
 
 async def get_list_of_tweets(user_me, following, cur_session) -> Twits | str:
     """
@@ -321,7 +323,7 @@ async def get_list_of_tweets(user_me, following, cur_session) -> Twits | str:
     return tweets
 
 
-async def collect_data_for_tweets(tweets) -> list[Twits] | str:
+async def collect_data_for_tweets(tweets) -> list[dict[str, Any]] | str:
     """
     Функция по преобразованию данных твитов в требуемый формат в ТЗ
     :param tweets:

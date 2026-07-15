@@ -1,7 +1,9 @@
+from typing import List
+
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, DeclarativeBase
 
 # 1. Строка подключения
 DATABASE_URL = "postgresql+asyncpg://admin:secretpassword@db:5432/fastapi_db"
@@ -17,12 +19,16 @@ async_session = async_sessionmaker(
     bind=engine, expire_on_commit=False, class_=AsyncSession
 )
 session = async_session()
-Base = declarative_base()
+# Base = declarative_base()
 
 
 async def get_db():
     async with async_session() as as_session:
         yield as_session
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class User(Base):
@@ -64,7 +70,7 @@ class User(Base):
         return f'"id": {self.id}, "name": {self.name}'
 
 
-user_following = Table(
+user_following: Table = Table(
     "user_following",
     Base.metadata,
     Column("i_follow", Integer, ForeignKey(User.id), primary_key=True),
