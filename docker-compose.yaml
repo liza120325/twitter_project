@@ -1,0 +1,66 @@
+services:
+
+  fastapi:
+    container_name: fastapi
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart:
+      always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://admin:secretpassword@db:5432/fastapi_db
+      STATIC_DIR: /static/media
+    networks:
+      - app-network
+    volumes:
+      - ./my_app:/fastapi_app/my_app
+      - ./static/media:/static/media
+
+
+  db:
+    container_name: db
+    image: postgres
+    environment:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: secretpassword
+        POSTGRES_DB: fastapi_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./pg_data:/var/lib/postgresql/18/docker
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+
+  nginx:
+    container_name: nginx
+    image: nginx
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+      - fastapi
+    networks:
+      - app-network
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html/static
+      - ./static/media:/usr/share/nginx/html/static/media
+
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  static_volume:
