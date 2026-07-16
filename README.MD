@@ -19,7 +19,14 @@
 
 ## Используемые инструменты: Python, FastApi, Docker, Docker Compose, PostgreSQL, SQLAlchemy, Pydantic, Pytest, Nginx.
 
-## Сборка и запуск приложения происходит через команду 'docker compose up -d'
-## Тестирование приложения происходит по команде 'docker compose -f docker-compose.test.yml up --abort-on-container-exit'
+## Сборка и запуск приложения происходит через команду: 
+``` bash
+docker compose up -d
+```
 
-## Документация доступна по адресу: ``` http://<your_domain>:8000/docs/
+## Тестирование приложения происходит по команде:
+``` bash
+docker compose -f docker-compose.test.yml up --abort-on-container-exit
+```
+
+## Документация доступна по адресу: ``` http://127.0.0.1:8000/docs/
