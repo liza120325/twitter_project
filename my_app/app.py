@@ -99,7 +99,8 @@ async def follow_user(api_key: Annotated[str, Header()], id: int) -> dict | str:
         logger.info(f"Получен пользователь на которого подписываемся {user_following}")
 
         logger.info("Проверяем подписку")
-        check = user_following in user_me.following
+        if isinstance(user_me, Base):
+            check = user_following in user_me.following
 
         if not check:
             logger.info("Пользователь не подписан")
@@ -135,7 +136,8 @@ async def unfollow_user(api_key: Annotated[str, Header()], id: int) -> dict | st
             "Проверяем, подписан ли текущий пользователь на того, "
             "от кого он хочет отписаться"
         )
-        check = user_following in user_me.following
+        if isinstance(user_me, Base):
+            check = user_following in user_me.following
 
         if check:
             await delete_following(user_me, user_following, session)
@@ -296,8 +298,9 @@ async def get_tweets(api_key: Annotated[str, Header()]) -> dict:
         user_me = await get_my_profile(api_key, session)
         logger.info(f"Получен текущий пользователь {user_me}")
 
-        following = [x.id for x in user_me.following]
-        logger.info(f"Получены подписки текущего пользователя {following}")
+        if isinstance(user_me, Base):
+            following = [x.id for x in user_me.following]
+            logger.info(f"Получены подписки текущего пользователя {following}")
 
         tweets = await get_list_of_tweets(user_me, following, session)
         logger.info(f"Получены твиты  {tweets}")
